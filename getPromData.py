@@ -110,7 +110,6 @@ if __name__ == "__main__":
         print(f"连接 Prometheus: {prom.url}, 状态: 连接失败")
     
     # 示例：获取 CPU 使用率
-    #query = 'node_cpu_seconds_total{cpu="0", instance="172.25.71.38:9100", job="node_exporter", mode="idle"}'
     query = 'node_memory_MemFree_bytes'
     df = get_prometheus_data(prom, query, time_range='5m', step="15s")
 
