@@ -1,5 +1,5 @@
 from prometheus_api_client import PrometheusConnect
-import datetime
+from datetime import datetime
 from datetime import timedelta
 import pandas as pd
 import yaml
@@ -14,7 +14,7 @@ def parse_time_range(time_range):
     time_unit = time_range[-1]  # 获取单位（m/h/d）
     delta = int(time_range[:-1])  # 获取数值部分
 
-    now = datetime.datetime.now()
+    now = datetime.now()
     if time_unit == "m":
         return now - timedelta(minutes=delta)
     elif time_unit == "h":
@@ -58,12 +58,15 @@ def get_prometheus_data(prom, query, start_time=None, end_time=None, time_range=
     # 解析时间范围
     if not start_time or not end_time:
         start_time = parse_time_range(time_range)
-        end_time = datetime.datetime.now()
+        end_time = datetime.now()
+    else:
+        start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+    
 
     # 解析 step 为 timedelta
     step_duration = parse_step(step)
 
-    print(f"查询时间范围: {start_time} - {end_time}, 步长: {step_duration}")
     # 获取 Prometheus 数据
     try:
         result = prom.get_metric_range_data(
@@ -87,31 +90,14 @@ def get_prometheus_data(prom, query, start_time=None, end_time=None, time_range=
         job = metric["metric"].get("job", "unknown")
 
         for value in metric["values"]:
-            timestamp = datetime.datetime.fromtimestamp(float(value[0]))
+            timestamp = datetime.fromtimestamp(float(value[0]))
             value = float(value[1])
 
             data_list.append([timestamp, instance, job, value])
 
     df = pd.DataFrame(data_list, columns=["timestamp", "instance", "job", "value"])
     df.set_index("timestamp", inplace=True)
-
+    print(f"列名: {df.columns}")
     return df
 
 
-if __name__ == "__main__":
-    with open("./config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-        prom_url = config.get('prometheus_url')
-
-    prom = create_prometheus_connection(prom_url)
-    if prom.check_prometheus_connection():
-        print(f"连接 Prometheus: {prom.url}, 状态: 连接成功")
-    else:
-        print(f"连接 Prometheus: {prom.url}, 状态: 连接失败")
-    
-    # 示例：获取 CPU 使用率
-    query = 'node_memory_MemFree_bytes'
-    df = get_prometheus_data(prom, query, time_range='5m', step="15s")
-
-    if df is not None:
-        print(df.head(10))

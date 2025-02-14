@@ -1,6 +1,8 @@
 import ollama
 import re
 import getPromData
+import yaml
+import os
 
 class OllamaClient:
     def __init__(self, model="deepseek-r1:7b"):
@@ -43,22 +45,16 @@ class OllamaClient:
         )
         return self.clean_response(response["message"]["content"])
 
-    def analyze_prometheus_data(self, query, time_range="10m", step="1m"):
+    def analyze_prometheus_data(self, prom_data, query):
         """
-        获取并分析 Prometheus 监控数据，并结合 AI 进行分析
+        分析已获取的 Prometheus 监控数据，并结合 AI 进行分析
+        :param prom_data: 从 Prometheus 查询出来的数据（pandas DataFrame 格式）
         :param query: Prometheus 查询语句
-        :param time_range: 查询时间范围（如 "10m", "1h"）
-        :param step: 数据间隔时间
         :return: AI 对监控数据的分析
         """
-        # 获取 Prometheus 数据
-        prom = getPromData.create_prometheus_connection()
-        prom_data = getPromData.get_prometheus_data(prom, query, time_range=time_range, step=step)
-
-        # 解析数据，提取关键信息
         if prom_data is None or prom_data.empty:
             print("获取的数据为空，无法分析。")
-            return None  # 避免后续代码报错
+            return "无法获取有效数据，无法进行分析。"
 
         # 将数据转换为 AI 可理解的格式
         formatted_data = f"Prometheus 数据查询 ({query}):\n{prom_data}"
@@ -82,6 +78,15 @@ if __name__ == "__main__":
     #print(ollama_client.chat(messages))
 
     # 3. 结合 Prometheus 监控数据进行 AI 分析
+    current_path = os.path.abspath(__file__)
+    with open(os.path.join(os.path.dirname(current_path), "config.yaml"), "r") as f:
+        config = yaml.safe_load(f)
+        prom_url = config.get('prometheus_url')
     
+    
+    prom = getPromData.create_prometheus_connection(prom_url)
     query = 'node_memory_MemFree_bytes'
-    print(ollama_client.analyze_prometheus_data(query, time_range="2m", step="15s"))
+    prom_data = getPromData.get_prometheus_data(prom, query, time_range='1m', step="15s")
+    analysis_result = ollama_client.analyze_prometheus_data(prom_data, query)
+    print(analysis_result)
+    
